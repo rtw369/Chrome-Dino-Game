@@ -4,7 +4,7 @@ import time
 import os
 import random
 
-WIN_WIDTH = 500
+WIN_WIDTH = 1000
 WIN_HEIGHT = 800
 
 pygame.font.init()
@@ -171,7 +171,7 @@ def draw_window(win, dino, base, obs, score):
 
 def main():
     base = Base(500)
-    obs = [Obs(600)]
+    obs = [Obs(WIN_WIDTH + 100)]
     dino = Dino(100, 500 - DINO_IMGS[0].get_height() + 15)
     clock = pygame.time.Clock()
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
@@ -196,7 +196,7 @@ def main():
             obstacle.move(score)
             if obstacle.x + obstacle.img.get_width() < -200:
                 obs.remove(obstacle)
-                obs.append(Obs(600))
+                obs.append(Obs(WIN_WIDTH + 100))
 
         base.move(score)
 
