@@ -7,6 +7,9 @@ import random
 WIN_WIDTH = 500
 WIN_HEIGHT = 800
 
+pygame.font.init()
+STAT_FONT = pygame.font.SysFont("comicsans", 50)
+
 DINO_IMGS = [pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "Dino1.png")))
              , pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "Dino2.png")))
              , pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "Jump.png")))
@@ -88,21 +91,19 @@ class Dino:
 
 
 class Base:
-    INIT_VEL = 10
     MAX_VEL = 30
     WIDTH = BASE_IMG.get_width()
     IMG = BASE_IMG
 
     def __init__(self, y):
         self.y = y
-        self.vel = self.INIT_VEL
+        self.vel = 0
         self.tick_count = 0
         self.x1 = 0
         self.x2 = self.WIDTH
 
-    def move(self):
-        self.tick_count += 1
-        self.vel = self.INIT_VEL + self.tick_count * 0.05
+    def move(self, score):
+        self.vel = 10 + score * 0.02
 
         if self.vel > self.MAX_VEL:
             self.vel = self.MAX_VEL
@@ -121,23 +122,62 @@ class Base:
         win.blit(self.IMG, (self.x2, self.y))
 
 
-def draw_window(win, dino, base):
+class Obs:
+    MAX_VEL = 30
+
+    def __init__(self, x):
+        self.x = x
+        self.img = OBS_IMGS[random.randrange(0, 5)]
+        self.y = 500 - self.img.get_height() + 15
+        self.vel = 0
+
+    def move(self, score):
+        self.vel = 10 + score * 0.02
+
+        if self.vel > self.MAX_VEL:
+            self.vel = self.MAX_VEL
+
+        self.x -= self.vel
+
+    def draw(self, win):
+        win.blit(self.img, (self.x, self.y))
+
+    def collide(self, dino):
+        dino_mask = dino.get_mask()
+        obs_mask = pygame.mask.from_surface(self.img)
+        obs_offset = (self.x - dino.x, self.y - round(dino.y))
+        is_overlap = dino_mask.overlap(obs_mask, obs_offset)
+
+        if is_overlap:
+            return True
+        return False
+
+
+def draw_window(win, dino, base, obs, score):
     win.blit(BG_IMG, (0, 0))
 
     base.draw(win)
 
+    for obstacle in obs:
+        obstacle.draw(win)
+
     dino.draw(win)
+
+    text = STAT_FONT.render(str(score), 1, (0, 0, 0))
+    win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 10))
 
     pygame.display.update()
 
 
 def main():
     base = Base(500)
+    obs = [Obs(600)]
     dino = Dino(100, 500 - DINO_IMGS[0].get_height() + 15)
     clock = pygame.time.Clock()
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
 
     run = True
+    score = 0
     while run:
         clock.tick(30)
         for event in pygame.event.get():
@@ -146,13 +186,21 @@ def main():
                 pygame.quit()
                 quit()
 
+        score += 1
+
         dino.move()
 
-        dino.jump()
+        # dino.jump()
 
-        base.move()
+        for obstacle in obs:
+            obstacle.move(score)
+            if obstacle.x + obstacle.img.get_width() < -200:
+                obs.remove(obstacle)
+                obs.append(Obs(600))
 
-        draw_window(win, dino, base)
+        base.move(score)
+
+        draw_window(win, dino, base, obs, score)
 
 
 main()
