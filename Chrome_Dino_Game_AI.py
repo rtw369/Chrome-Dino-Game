@@ -48,7 +48,7 @@ class Dino:
 
     def jump(self):
         if self.y >= 500 - self.img.get_height() + 15:
-            self.vel = -12
+            self.vel = -13
             self.tick_count = 0
         self.height = self.y
 
@@ -58,8 +58,8 @@ class Dino:
         d = self.vel * self.tick_count + 1.5 * self.tick_count ** 2
 
         # makes the dino fall slower.
-        if d >= 12:
-            d = 12
+        if d >= 16:
+            d = 16
 
         if d < 0:
             d -= 2
@@ -83,7 +83,28 @@ class Dino:
 
         if self.y < 500 - self.img.get_height() + 15:
             self.img = self.IMGS[2]
+        else:
+            self.y = 500 - self.img.get_height() + 15
 
+        win.blit(self.img, (self.x, self.y))
+
+    def draw_crouch(self, win):
+        self.img_count += 1
+
+        if self.img_count < self.ANIMATION_TIME:
+            self.img = self.IMGS[3]
+        elif self.img_count < self.ANIMATION_TIME * 2:
+            self.img = self.IMGS[4]
+        elif self.img_count < self.ANIMATION_TIME * 2 + 1:
+            self.img = self.IMGS[3]
+            self.img_count = 0
+
+        self.y = 500 - self.img.get_height() + 15
+
+        win.blit(self.img, (self.x, self.y))
+
+    def draw_dead(self, win):
+        self.img = self.IMGS[5]
         win.blit(self.img, (self.x, self.y))
 
     def get_mask(self):
@@ -161,7 +182,10 @@ def draw_window(win, dino, base, obs, score):
     for obstacle in obs:
         obstacle.draw(win)
 
-    dino.draw(win)
+    if pygame.key.get_pressed()[pygame.K_DOWN] and dino.y >= 500 - dino.img.get_height() + 15:
+        dino.draw_crouch(win)
+    else:
+        dino.draw(win)
 
     text = STAT_FONT.render(str(score), 1, (0, 0, 0))
     win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 10))
@@ -190,10 +214,15 @@ def main():
 
         dino.move()
 
-        # dino.jump()
+        if pygame.key.get_pressed()[pygame.K_SPACE] and not pygame.key.get_pressed()[pygame.K_DOWN]:
+            dino.jump()
 
         for obstacle in obs:
             obstacle.move(score)
+
+            if obstacle.collide(dino):
+                run = False
+
             if obstacle.x + obstacle.img.get_width() < -200:
                 obs.remove(obstacle)
                 obs.append(Obs(WIN_WIDTH + 100))
@@ -201,6 +230,16 @@ def main():
         base.move(score)
 
         draw_window(win, dino, base, obs, score)
+
+    while not run:
+        clock.tick(30)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+
+        dino.draw_dead(win)
+        pygame.display.update()
 
 
 main()
