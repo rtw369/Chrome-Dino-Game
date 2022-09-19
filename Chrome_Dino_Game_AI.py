@@ -112,7 +112,7 @@ class Dino:
 
 
 class Base:
-    MAX_VEL = 30
+    MAX_VEL = 40
     WIDTH = BASE_IMG.get_width()
     IMG = BASE_IMG
 
@@ -124,7 +124,7 @@ class Base:
         self.x2 = self.WIDTH
 
     def move(self, score):
-        self.vel = 10 + score * 0.02
+        self.vel = 15 + score * 0.02
 
         if self.vel > self.MAX_VEL:
             self.vel = self.MAX_VEL
@@ -144,7 +144,7 @@ class Base:
 
 
 class Obs:
-    MAX_VEL = 30
+    MAX_VEL = 40
 
     def __init__(self, x):
         self.x = x
@@ -153,7 +153,7 @@ class Obs:
         self.vel = 0
 
     def move(self, score):
-        self.vel = 10 + score * 0.02
+        self.vel = 15 + score * 0.02
 
         if self.vel > self.MAX_VEL:
             self.vel = self.MAX_VEL
