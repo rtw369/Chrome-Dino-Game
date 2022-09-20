@@ -144,12 +144,26 @@ class Base:
 
 
 class Obs:
+    ANIMATION_TIME = 5
     MAX_VEL = 40
 
     def __init__(self, x):
         self.x = x
-        self.img = OBS_IMGS[random.randrange(0, 5)]
-        self.y = 500 - self.img.get_height() + 15
+        self.img_num = random.randrange(0, 8)
+        self.img = OBS_IMGS[self.img_num]
+        self.img_count = 0
+
+        if self.img_num == 6 or self.img_num == 7:
+            n = random.randrange(1, 4)
+            if n == 1:
+                self.y = 500 - self.img.get_height() + 15
+            elif n == 2:
+                self.y = 500 - self.img.get_height() + 15 - DINO_IMGS[0].get_height()
+            else:
+                self.y = 500 - self.img.get_height() + 15 - DINO_IMGS[3].get_height()
+        else:
+            self.y = 500 - self.img.get_height() + 15
+
         self.vel = 0
 
     def move(self, score):
@@ -161,6 +175,17 @@ class Obs:
         self.x -= self.vel
 
     def draw(self, win):
+        self.img_count += 1
+
+        if self.img_num == 6 or self.img_num == 7:
+            if self.img_count < self.ANIMATION_TIME:
+                self.img = OBS_IMGS[6]
+            elif self.img_count < self.ANIMATION_TIME * 2:
+                self.img = OBS_IMGS[7]
+            elif self.img_count < self.ANIMATION_TIME * 2 + 1:
+                self.img = OBS_IMGS[6]
+                self.img_count = 0
+
         win.blit(self.img, (self.x, self.y))
 
     def collide(self, dino):
@@ -223,9 +248,11 @@ def main():
             if obstacle.collide(dino):
                 run = False
 
+            if obstacle.x + obstacle.img.get_width() < 300 and len(obs) < 2:
+                obs.append(Obs(WIN_WIDTH + random.randrange(0, 300)))
+
             if obstacle.x + obstacle.img.get_width() < -200:
                 obs.remove(obstacle)
-                obs.append(Obs(WIN_WIDTH + 100))
 
         base.move(score)
 
@@ -240,6 +267,9 @@ def main():
 
         dino.draw_dead(win)
         pygame.display.update()
+
+        if pygame.key.get_pressed()[pygame.K_SPACE]:
+            main()
 
 
 main()
