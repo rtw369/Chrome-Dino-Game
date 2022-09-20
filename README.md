@@ -20,3 +20,7 @@ Screen size will be equivalent to phone screen size, two bases will move towards
 
 # AI
 Use the configuration settings from "TechWithTim Flappy Bird AI Tutorial"
+
+Input: Dino.x, Obstacle height(pterodactyl may be able to be dodged by crouching), Obstacle.x
+Output: Jump or crouch
+Fitness: Longest surviving dino, encourage to jump over the obstacle rather than jumping onto one.
