@@ -7,8 +7,12 @@ import random
 WIN_WIDTH = 1000
 WIN_HEIGHT = 800
 
+GEN = 0
+
 pygame.font.init()
 STAT_FONT = pygame.font.SysFont("comicsans", 50)
+
+high_score = 0
 
 DINO_IMGS = [pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "Dino1.png")))
              , pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "Dino2.png")))
@@ -45,12 +49,19 @@ class Dino:
         self.height = self.y
         self.img_count = 0
         self.img = self.IMGS[0]
+        self.down_pressed = False
 
     def jump(self):
+        self.down_pressed = False
+
         if self.y >= 500 - self.img.get_height() + 15:
             self.vel = -13
             self.tick_count = 0
         self.height = self.y
+
+    def crouch(self):
+        if self.y >= 500 - self.img.get_height() + 15:
+            self.down_pressed = True
 
     def move(self):
         self.tick_count += 1
@@ -124,7 +135,7 @@ class Base:
         self.x2 = self.WIDTH
 
     def move(self, score):
-        self.vel = 15 + score * 0.02
+        self.vel = 20 + score * 0.02
 
         if self.vel > self.MAX_VEL:
             self.vel = self.MAX_VEL
@@ -158,7 +169,7 @@ class Obs:
             if n == 1:
                 self.y = 500 - self.img.get_height() + 15
             elif n == 2:
-                self.y = 500 - self.img.get_height() + 15 - DINO_IMGS[0].get_height()
+                self.y = 500 - self.img.get_height() + 15 - DINO_IMGS[0].get_height() - 20
             else:
                 self.y = 500 - self.img.get_height() + 15 - DINO_IMGS[3].get_height()
         else:
@@ -167,7 +178,7 @@ class Obs:
         self.vel = 0
 
     def move(self, score):
-        self.vel = 15 + score * 0.02
+        self.vel = 20 + score * 0.02
 
         if self.vel > self.MAX_VEL:
             self.vel = self.MAX_VEL
@@ -199,7 +210,7 @@ class Obs:
         return False
 
 
-def draw_window(win, dino, base, obs, score):
+def draw_window(win, dinos, base, obs, score):
     win.blit(BG_IMG, (0, 0))
 
     base.draw(win)
@@ -207,21 +218,33 @@ def draw_window(win, dino, base, obs, score):
     for obstacle in obs:
         obstacle.draw(win)
 
-    if pygame.key.get_pressed()[pygame.K_DOWN] and dino.y >= 500 - dino.img.get_height() + 15:
-        dino.draw_crouch(win)
-    else:
-        dino.draw(win)
+    for dino in dinos:
+        if dino.down_pressed:
+            dino.draw_crouch(win)
+        else:
+            dino.draw(win)
 
     text = STAT_FONT.render(str(score), 1, (0, 0, 0))
+    win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 70))
+
+    text = STAT_FONT.render("HI "+str(high_score), 1, (0, 0, 0))
     win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 10))
+
+    text = STAT_FONT.render("Gen: " + str(GEN), 1, (0, 0, 0))
+    win.blit(text, (10, 10))
+
+    text = STAT_FONT.render("Dino #: " + str(len(dinos)), 1, (0, 0, 0))
+    win.blit(text, (10, 70))
 
     pygame.display.update()
 
 
-def main():
+def play():
+    global high_score
+
     base = Base(500)
     obs = [Obs(WIN_WIDTH + 100)]
-    dino = Dino(100, 500 - DINO_IMGS[0].get_height() + 15)
+    dinos = [Dino(100, 500 - DINO_IMGS[0].get_height() + 15)]
     clock = pygame.time.Clock()
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
 
@@ -237,16 +260,26 @@ def main():
 
         score += 1
 
-        dino.move()
+        for dino in dinos:
+            dino.move()
 
-        if pygame.key.get_pressed()[pygame.K_SPACE] and not pygame.key.get_pressed()[pygame.K_DOWN]:
-            dino.jump()
+            if pygame.key.get_pressed()[pygame.K_DOWN]:
+                dino.crouch()
+            else:
+                dino.down_pressed = False
+
+            if pygame.key.get_pressed()[pygame.K_SPACE] and not pygame.key.get_pressed()[pygame.K_DOWN]:
+                dino.jump()
 
         for obstacle in obs:
             obstacle.move(score)
 
-            if obstacle.collide(dino):
-                run = False
+            for dino in dinos:
+                if obstacle.collide(dino):
+                    run = False
+
+                    if score > high_score:
+                        high_score = score
 
             if obstacle.x + obstacle.img.get_width() < 300 and len(obs) < 2:
                 obs.append(Obs(WIN_WIDTH + random.randrange(0, 300)))
@@ -256,7 +289,7 @@ def main():
 
         base.move(score)
 
-        draw_window(win, dino, base, obs, score)
+        draw_window(win, dinos, base, obs, score)
 
     while not run:
         clock.tick(30)
@@ -269,7 +302,105 @@ def main():
         pygame.display.update()
 
         if pygame.key.get_pressed()[pygame.K_SPACE]:
-            main()
+            play()
 
 
-main()
+def eval_gen(genomes, config):
+    global GEN
+    GEN += 1
+    nets = []
+    ge = []
+    dinos = []
+
+    for _, g in genomes:
+        net = neat.nn.FeedForwardNetwork.create(g, config)
+        nets.append(net)
+        dinos.append(Dino(100, 500 - DINO_IMGS[0].get_height() + 15))
+        g.fitness = 0
+        ge.append(g)
+
+    base = Base(500)
+    obs = [Obs(WIN_WIDTH + 100)]
+    clock = pygame.time.Clock()
+    win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
+
+    run = True
+    global high_score
+    score = 0
+
+    while run:
+        # clock.tick(30)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+                pygame.quit()
+                quit()
+
+        score += 1
+
+        obs_ind = 0
+        if len(dinos) > 0:
+            if len(obs) > 1 and dinos[0].x > obs[0].x + obs[0].img.get_width():
+                obs_ind = 1
+        else:
+            if score > high_score:
+                high_score = score
+
+            run = False
+            break
+
+        for x, dino in enumerate(dinos):
+            dino.move()
+            ge[x].fitness += 0.1
+
+            output = nets[x].activate((obs[obs_ind].y, abs(dino.x - obs[obs_ind].x), obs[obs_ind].vel))
+
+            if output[0] > 0.5:
+                dino.down_pressed = False
+                dino.jump()
+            elif output[0] < -0.5:
+                dino.crouch()
+            else:
+                dino.down_pressed = False
+
+        base.move(score)
+
+        for obstacle in obs:
+            obstacle.move(score)
+
+            for x, dino in enumerate(dinos):
+                if obstacle.collide(dino):
+                    ge[x].fitness -= 1
+                    dinos.pop(x)
+                    nets.pop(x)
+                    ge.pop(x)
+
+            if obstacle.x + obstacle.img.get_width() < 300 and len(obs) < 2:
+                obs.append(Obs(WIN_WIDTH + random.randrange(0, 300)))
+
+            if obstacle.x + obstacle.img.get_width() < -200:
+                obs.remove(obstacle)
+
+        draw_window(win, dinos, base, obs, score)
+
+
+def run(config_path):
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet,
+                                neat.DefaultStagnation, config_path)
+
+    p = neat.Population(config)
+
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
+
+    winner = p.run(eval_gen, 150)
+
+
+if __name__ == "__main__":
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, "config.txt")
+    run(config_path)
+
+
+# play()
