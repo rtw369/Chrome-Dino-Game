@@ -1,6 +1,6 @@
 import pygame
 import neat
-import time
+import pickle
 import os
 import random
 
@@ -123,7 +123,7 @@ class Dino:
 
 
 class Base:
-    MAX_VEL = 40
+    MAX_VEL = 30
     WIDTH = BASE_IMG.get_width()
     IMG = BASE_IMG
 
@@ -135,7 +135,7 @@ class Base:
         self.x2 = self.WIDTH
 
     def move(self, score):
-        self.vel = 20 + score * 0.02
+        self.vel = 20 + score * 0.01
 
         if self.vel > self.MAX_VEL:
             self.vel = self.MAX_VEL
@@ -156,7 +156,7 @@ class Base:
 
 class Obs:
     ANIMATION_TIME = 5
-    MAX_VEL = 40
+    MAX_VEL = 30
 
     def __init__(self, x):
         self.x = x
@@ -165,20 +165,20 @@ class Obs:
         self.img_count = 0
 
         if self.img_num == 6 or self.img_num == 7:
-            n = random.randrange(1, 4)
+            n = random.randrange(1, 5)
             if n == 1:
                 self.y = 500 - self.img.get_height() + 15
-            elif n == 2:
+            elif n == 2 or n == 3:
                 self.y = 500 - self.img.get_height() + 15 - DINO_IMGS[0].get_height() - 20
             else:
-                self.y = 500 - self.img.get_height() + 15 - DINO_IMGS[3].get_height()
+                self.y = 500 - self.img.get_height() - DINO_IMGS[3].get_height() + 15
         else:
             self.y = 500 - self.img.get_height() + 15
 
         self.vel = 0
 
     def move(self, score):
-        self.vel = 20 + score * 0.02
+        self.vel = 20 + score * 0.01
 
         if self.vel > self.MAX_VEL:
             self.vel = self.MAX_VEL
@@ -235,6 +235,28 @@ def draw_window(win, dinos, base, obs, score):
 
     text = STAT_FONT.render("Dino #: " + str(len(dinos)), 1, (0, 0, 0))
     win.blit(text, (10, 70))
+
+    pygame.display.update()
+
+
+def draw_default_win(win, dino, base, obs, score):
+    win.blit(BG_IMG, (0, 0))
+
+    base.draw(win)
+
+    for obstacle in obs:
+        obstacle.draw(win)
+
+    if dino.down_pressed:
+        dino.draw_crouch(win)
+    else:
+        dino.draw(win)
+
+    text = STAT_FONT.render(str(score), 1, (0, 0, 0))
+    win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 70))
+
+    text = STAT_FONT.render("HI " + str(high_score), 1, (0, 0, 0))
+    win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 10))
 
     pygame.display.update()
 
@@ -298,7 +320,8 @@ def play():
                 pygame.quit()
                 quit()
 
-        dino.draw_dead(win)
+        for dino in dinos:
+            dino.draw_dead(win)
         pygame.display.update()
 
         if pygame.key.get_pressed()[pygame.K_SPACE]:
@@ -351,15 +374,17 @@ def eval_gen(genomes, config):
 
         for x, dino in enumerate(dinos):
             dino.move()
+
             ge[x].fitness += 0.1
 
-            output = nets[x].activate((obs[obs_ind].y, abs(dino.x - obs[obs_ind].x), obs[obs_ind].vel))
+            output = nets[x].activate((obs[obs_ind].y - (500 - DINO_IMGS[0].get_height() + 15),
+                                       abs(dino.x - obs[obs_ind].x), obs[obs_ind].vel))
 
-            if output[0] > 0.5:
+            if output[1] > 0.5:
+                dino.crouch()
+            elif output[0] > 0.5:
                 dino.down_pressed = False
                 dino.jump()
-            elif output[0] < -0.5:
-                dino.crouch()
             else:
                 dino.down_pressed = False
 
@@ -375,6 +400,12 @@ def eval_gen(genomes, config):
                     nets.pop(x)
                     ge.pop(x)
 
+                if score > 10000:
+                    ge[x].fitness += 100
+                    dinos.pop(x)
+                    nets.pop(x)
+                    ge.pop(x)
+
             if obstacle.x + obstacle.img.get_width() < 300 and len(obs) < 2:
                 obs.append(Obs(WIN_WIDTH + random.randrange(0, 300)))
 
@@ -382,6 +413,93 @@ def eval_gen(genomes, config):
                 obs.remove(obstacle)
 
         draw_window(win, dinos, base, obs, score)
+
+
+def run_genome(genomes, config):
+    nets = []
+    ge = []
+    dinos = []
+
+    for _, g in genomes:
+        net = neat.nn.FeedForwardNetwork.create(g, config)
+        nets.append(net)
+        dinos.append(Dino(100, 500 - DINO_IMGS[0].get_height() + 15))
+        g.fitness = 0
+        ge.append(g)
+
+    dino = dinos[0]
+
+    base = Base(500)
+    obs = [Obs(WIN_WIDTH + 100)]
+    clock = pygame.time.Clock()
+    win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
+
+    run = True
+    global high_score
+    score = 0
+
+    while run:
+        clock.tick(30)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+                pygame.quit()
+                quit()
+
+        score += 1
+
+        obs_ind = 0
+        if len(dinos) > 0:
+            if len(obs) > 1 and dinos[0].x > obs[0].x + obs[0].img.get_width():
+                obs_ind = 1
+        else:
+            run = False
+            break
+
+        dino.move()
+
+        output = nets[0].activate((obs[obs_ind].y - (500 - DINO_IMGS[0].get_height() + 15),
+                                   abs(dino.x - obs[obs_ind].x), obs[obs_ind].vel))
+
+        if output[1] > 0.5:
+            dino.crouch()
+        elif output[0] > 0.5:
+            dino.down_pressed = False
+            dino.jump()
+        else:
+            dino.down_pressed = False
+
+        base.move(score)
+
+        for obstacle in obs:
+            obstacle.move(score)
+
+            if obstacle.collide(dino):
+                run = False
+
+                if score > high_score:
+                    high_score = score
+
+            if obstacle.x + obstacle.img.get_width() < 300 and len(obs) < 2:
+                obs.append(Obs(WIN_WIDTH + random.randrange(0, 300)))
+
+            if obstacle.x + obstacle.img.get_width() < -200:
+                obs.remove(obstacle)
+
+        draw_default_win(win, dino, base, obs, score)
+
+    while not run:
+        clock.tick(30)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+
+        dino.draw_dead(win)
+        pygame.display.update()
+
+        if pygame.key.get_pressed()[pygame.K_SPACE]:
+            run_genome(genomes, config)
 
 
 def run(config_path):
@@ -394,7 +512,16 @@ def run(config_path):
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
 
-    winner = p.run(eval_gen, 150)
+    '''winner = p.run(eval_gen, 20)
+
+    with open("DinoAI2.pickle", "wb") as f:
+        pickle.dump(winner, f)'''
+
+    pickle_in = open("DinoAI2.pickle", "rb")
+    genome = pickle.load(pickle_in)
+    genomes = [(1, genome)]
+
+    run_genome(genomes, config)
 
 
 if __name__ == "__main__":
