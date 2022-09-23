@@ -21,6 +21,6 @@ Screen size will be equivalent to phone screen size, two bases will move towards
 # AI
 Use the configuration settings from "TechWithTim Flappy Bird AI Tutorial"
 
-Input: obstacle.y, Distance between the obstacle and the dino, obstacle velocity
+Input: obstacle distance from the base, distance between the obstacle and the dino, obstacle velocity
 Output: jump or crouch
-Fitness: Longest surviving dino, encourage to jump over the obstacle rather than jumping onto one.
+Fitness: Longest surviving dino, encourage to jump over and crouch under specific obstacles.
